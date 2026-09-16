@@ -32,6 +32,7 @@
             print "Kunjungan Industri";
             break;
         default:
+        
             print("Hari tidak ditemukan");
     }
     ?> 
