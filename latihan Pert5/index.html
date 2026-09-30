@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PC BUILD TO OS — Interactive Computer Architecture Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<style>
+/* GLOBAL */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#111;font-family:'Segoe UI',system-ui,sans-serif;color:#e6e6e6;user-select:none}
+button{font:inherit;cursor:pointer}
+/* 3D WORLD */
+#c3d{position:fixed;inset:0}
+#c3d canvas{display:block;touch-action:none}
+#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:60}
+/* WORKBENCH / BUILD UI */
+.panel{position:fixed;background:rgba(22,24,27,.88);border:1px solid #394048;border-radius:6px;font-size:12px;z-index:10}
+.panel h4{font-size:10px;letter-spacing:.15em;color:#8f99a4;padding:8px 10px 4px;font-weight:600}
+#topbar{top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:6px 12px;white-space:nowrap}
+.title{font-weight:700;letter-spacing:.1em;font-size:12px}
+.missions{display:flex;gap:3px}
+.mis{padding:3px 7px;border-radius:3px;background:#2a2e33;color:#77808a;font-size:10px;letter-spacing:.05em}
+.mis.done{background:#1e4a2c;color:#8fe0a8}.mis.cur{background:#4d3f18;color:#f2cf70}
+.mute{background:#2b3036;border:1px solid #444c55;color:#fff;border-radius:4px;padding:3px 8px}
+#inv{top:56px;left:10px;width:196px;max-height:calc(100vh - 150px);overflow:auto}
+.item{display:flex;justify-content:space-between;padding:5px 10px;cursor:pointer;border-top:1px solid #2a2f34}
+.item:hover{background:#2c3238}.item .st{color:#666}.item.ok .st{color:#6fd08c}
+#tools{top:56px;right:10px;width:214px;max-height:calc(100vh - 150px);overflow:auto}
+.tbtn{display:block;width:calc(100% - 16px);margin:3px 8px;padding:5px 8px;background:#2b3036;color:#dde;border:1px solid #3d444c;border-radius:4px;text-align:left;font-size:11.5px}
+.tbtn.on{background:#35557f;border-color:#5b86c2}.tbtn.ok{color:#7fd79a}.tbtn.dis{opacity:.45}
+.row3{display:flex;gap:4px;margin:3px 8px}.row3 .tbtn{margin:0;width:auto;flex:1;text-align:center}
+#bstat{padding:2px 10px 8px;line-height:1.6;color:#b9c1c9;font-size:11px}
+#bstat b{color:#fff;font-weight:600}
+#bottom{bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:8px;align-items:center}
+.big{padding:9px 16px;border-radius:4px;border:1px solid #4a525b;background:#2d3339;color:#fff;font-weight:600;letter-spacing:.08em;font-size:12px}
+.big.power{background:#6e1d1d;border-color:#b33}
+#hint{max-width:340px;font-size:11px;color:#c9cfd6;padding:0 8px}
+#tip{position:fixed;pointer-events:none;background:rgba(10,11,12,.9);border:1px solid #444;padding:4px 8px;border-radius:4px;font-size:11px;z-index:20;display:none}
+#toast{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:25;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.tst{padding:8px 16px;border-radius:4px;font-weight:600;letter-spacing:.05em;font-size:13px;background:#1f2a1f;border:1px solid #3e7a48;color:#aef0bd}
+.tst.err{background:#2d1616;border-color:#a33;color:#ffb3b3}.tst.info{background:#1c2430;border-color:#4b6d99;color:#cfe0f7}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:40}
+#modal .box{background:#17191c;border:1px solid #444b53;border-radius:6px;padding:18px 22px;min-width:330px;font-family:Consolas,monospace;font-size:13px}
+#modal pre{font-family:inherit;line-height:1.55}
+/* MONITOR UI */
+#monitorWorld{position:fixed;inset:0;display:none;z-index:30;background:radial-gradient(ellipse at center,#23262a,#08090a)}
+#monHud{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;font-size:11px;white-space:nowrap}
+.stg{padding:3px 9px;border-radius:3px;background:#24282c;color:#6f7780;letter-spacing:.08em}
+.stg.on{background:#35557f;color:#fff}
+#monStatus{color:#aab;padding:0 8px;font-family:Consolas,monospace}
+#bezel{position:absolute;left:50%;top:calc(50% + 18px);transform:translate(-50%,-50%);background:linear-gradient(#141516,#0b0b0c);border-radius:10px;padding:14px 14px 26px;box-shadow:0 0 0 1px #2b2d30,0 30px 80px #000}
+#bezel:after{content:'';position:absolute;bottom:9px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:#3aa0ff;box-shadow:0 0 6px #3aa0ff}
+#screenBox{position:relative;overflow:hidden;background:#000}
+#screen{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;font-family:Consolas,'Courier New',monospace}
+.scr{position:absolute;inset:0;display:none}.scr.on{display:block}
+.glitch{animation:gl .12s steps(2) infinite}
+@keyframes gl{0%{transform:translate(0,0);filter:none}50%{transform:translate(-6px,3px) skewX(4deg);filter:hue-rotate(90deg) contrast(1.6)}100%{transform:translate(5px,-2px);filter:invert(.15)}}
+/* POST */
+#s-post,#s-msg{background:#000;color:#c8c8c8;font-size:19px;padding:34px 44px}
+#postText{white-space:pre-wrap;line-height:1.45}
+.ok{color:#63e27a}.err{color:#ff5a5a}.warn{color:#ffca4f}.dim{color:#777}.hl{color:#fff;background:#333;padding:0 6px}
+.postlogo{position:absolute;right:44px;top:34px;text-align:right;color:#9aa;font-size:15px;border:1px solid #444;padding:10px 16px}
+.sbtn{background:#1d2a3a;border:1px solid #4a6c94;color:#fff;padding:8px 16px;margin-right:10px;margin-top:18px;font-family:inherit;font-size:16px}
+.sbtn:hover{background:#2c4466}
+#s-nosig{background:#000}
+.osd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:2px solid #555;background:#101214;padding:26px 40px;text-align:center;font-family:'Segoe UI',sans-serif;color:#ddd}
+.osd h2{font-size:26px;letter-spacing:.1em;margin-bottom:8px}
+/* BIOS UI */
+#s-bios{background:#0d1016;color:#d5d9df;font-family:'Segoe UI',sans-serif;font-size:15px}
+.bh{height:58px;background:linear-gradient(#1a1f28,#12161d);border-bottom:2px solid #d8962f;display:flex;align-items:center;padding:0 24px;gap:24px}
+.bh .lg{font-weight:700;letter-spacing:.12em;color:#f0b24a;font-size:18px}
+.btabs{display:flex;background:#141922;border-bottom:1px solid #2a313c}
+.btab{padding:12px 20px;color:#9aa4b2;cursor:pointer;font-size:14px;letter-spacing:.06em}
+.btab:hover{color:#fff}.btab.on{color:#fff;background:#232b38;box-shadow:inset 0 -3px #d8962f}
+.bbody{display:flex;height:calc(720px - 58px - 44px - 34px)}
+.bmain{flex:1;padding:18px 26px;overflow:auto}
+.bside{width:280px;background:#11151c;border-left:1px solid #2a313c;padding:14px 18px;font-size:13px}
+.bside h5,.bmain h5{color:#d8962f;letter-spacing:.12em;font-size:12px;margin:10px 0 6px}
+.bfoot{height:34px;background:#141922;border-top:1px solid #2a313c;display:flex;align-items:center;padding:0 20px;gap:26px;font-size:12px;color:#8a94a2}
+.kv{display:grid;grid-template-columns:230px 1fr;gap:5px 10px;font-size:14px}
+.kv div:nth-child(odd){color:#8f9aa8}
+.bopt{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #222a35;max-width:720px}
+.bsel{display:flex;gap:6px}
+.bsel span{padding:5px 12px;border:1px solid #3a4452;cursor:pointer;border-radius:3px;font-size:13px}
+.bsel span.on{background:#d8962f;color:#111;border-color:#d8962f;font-weight:600}
+.bootl{list-style:none;max-width:520px}
+.bootl li{padding:11px 14px;margin:6px 0;background:#1a212c;border:1px solid #34404f;border-radius:4px;cursor:grab;display:flex;justify-content:space-between}
+.bootl li.drag{opacity:.4}.bootl li.over{border-color:#d8962f}
+.bootl li .na{color:#e0675a;font-size:12px}
+.bbtn{background:#232b38;border:1px solid #3d4a5c;color:#e5e9ef;padding:9px 16px;margin:6px 8px 6px 0;border-radius:3px;font-size:14px}
+.bbtn:hover{background:#d8962f;color:#111}
+.mon{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mon div{background:#151b24;border:1px solid #2a3340;padding:12px;border-radius:4px}
+.mon b{display:block;font-size:24px;color:#fff;font-family:Consolas,monospace}
+.mon span{font-size:11px;color:#8f9aa8;letter-spacing:.1em}
+/* OS / INSTALLER */
+#s-inst{background:linear-gradient(135deg,#1b3350,#284e72);font-family:'Segoe UI',sans-serif;color:#1d2126}
+.iwin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:700px;background:#f3f4f6;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);padding:30px 36px;min-height:360px}
+.iwin h2{font-weight:600;font-size:24px;margin-bottom:12px}
+.ibtn{background:#1f6fd1;color:#fff;border:none;padding:10px 26px;border-radius:4px;font-size:15px;margin-top:18px}
+.ibtn.sec{background:#d9dde2;color:#222;margin-left:8px}
+.disk{border:1px solid #c7ccd3;padding:10px 14px;margin:6px 0;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;background:#fff}
+.disk.sel{border-color:#1f6fd1;box-shadow:0 0 0 2px #1f6fd155}
+.pbar{height:18px;background:#d9dde2;border-radius:3px;overflow:hidden;margin:14px 0}
+.pbar i{display:block;height:100%;width:0;background:#1f6fd1}
+.mono{font-family:Consolas,monospace;font-size:14px;white-space:pre}
+/* DESKTOP UI */
+#s-desk{font-family:'Segoe UI',sans-serif;background:linear-gradient(170deg,#27425a 0%,#4f7690 45%,#b9967a 100%)}
+.mtn{position:absolute;bottom:44px;left:0;right:0;height:260px;background:#223445;clip-path:polygon(0 70%,12% 40%,22% 58%,36% 22%,50% 55%,62% 35%,78% 62%,90% 30%,100% 50%,100% 100%,0 100%);opacity:.85}
+.mtn.b{height:170px;background:#172431;clip-path:polygon(0 60%,18% 30%,30% 55%,48% 25%,66% 60%,80% 40%,100% 65%,100% 100%,0 100%)}
+#icons{position:absolute;left:16px;top:16px;display:grid;grid-template-rows:repeat(6,92px);gap:4px}
+.ico{width:84px;text-align:center;color:#fff;font-size:12px;cursor:pointer;padding:6px 2px;border-radius:5px;text-shadow:0 1px 3px #000}
+.ico:hover{background:rgba(255,255,255,.14)}
+.ico i{display:block;width:46px;height:46px;margin:0 auto 6px;border-radius:9px;font-style:normal;font-size:22px;line-height:46px;color:#fff;box-shadow:0 3px 8px rgba(0,0,0,.35)}
+#wins{position:absolute;inset:0 0 44px 0;pointer-events:none}
+.win{position:absolute;background:#f4f5f7;color:#1c1f24;border-radius:8px;box-shadow:0 14px 44px rgba(0,0,0,.5);border:1px solid #8a939e;pointer-events:auto;overflow:hidden;display:flex;flex-direction:column}
+.win .tb{height:34px;background:#e2e5e9;display:flex;align-items:center;padding:0 6px 0 12px;cursor:move;font-size:13px;font-weight:600;flex:none}
+.win .tb span{flex:1}
+.win .tb button{border:none;background:none;width:30px;height:26px;font-size:15px;border-radius:4px}
+.win .tb button:hover{background:#e0474c;color:#fff}
+.win .wc{flex:1;overflow:auto;padding:14px;font-size:13px}
+.win.dark{background:#1b1e22;color:#dde2e8}.win.dark .tb{background:#2a2e34;color:#eee}
+#taskbar{position:absolute;left:0;right:0;bottom:0;height:44px;background:rgba(18,20,24,.93);display:flex;align-items:center;padding:0 8px;gap:6px;color:#fff;font-size:12px}
+.tbb{background:rgba(255,255,255,.07);border:none;color:#fff;height:34px;padding:0 12px;border-radius:5px;font-size:12px}
+.tbb:hover{background:rgba(255,255,255,.16)}
+#tray{margin-left:auto;display:flex;gap:16px;padding-right:10px;font-family:Consolas,monospace}
+#startMenu{position:absolute;left:8px;bottom:50px;width:260px;background:#1f2328;border-radius:8px;padding:8px;display:none;box-shadow:0 10px 30px #000;color:#fff;font-size:13px}
+#startMenu div{padding:9px 12px;border-radius:4px;cursor:pointer}#startMenu div:hover{background:#2f353d}
+.notif{position:absolute;right:14px;bottom:56px;background:#23272d;color:#fff;border-left:4px solid #3a8ee6;padding:10px 14px;border-radius:4px;font-size:13px;box-shadow:0 8px 20px #0008;max-width:340px}
+.notif.err{border-color:#e04545}
+.tabs{display:flex;gap:2px;margin-bottom:10px}
+.tabs span{padding:6px 14px;background:#dde1e6;cursor:pointer;border-radius:4px 4px 0 0;font-size:12px}
+.tabs span.on{background:#1f6fd1;color:#fff}
+table.it{border-collapse:collapse;width:100%}
+table.it td{padding:6px 8px;border-bottom:1px solid #d5d9de}
+table.it td:first-child{color:#5b6570;width:44%}
+.bar{height:16px;background:#2b3037;border-radius:2px;overflow:hidden;margin:3px 0 10px}
+.bar i{display:block;height:100%;background:#3a8ee6;transition:width .15s}
+.sval{font-family:Consolas,monospace;font-size:20px;color:#fff}
+.warnb{background:#8a1c1c;color:#fff;padding:8px;text-align:center;font-weight:700;letter-spacing:.1em;animation:bl .5s infinite alternate;margin:6px 0}
+@keyframes bl{to{background:#d42b2b}}
+/* GAME UI */
+.gamewrap{display:flex;gap:12px}
+.gamewrap canvas{background:#000;border-radius:3px;display:block}
+.gside{width:170px;font-size:12px;line-height:1.6;color:#c5ccd4}
+.gside b{color:#fff}
+/* BSOD */
+#s-bsod{background:#0a5ec0;color:#fff;font-family:'Segoe UI',sans-serif;padding:110px 140px}
+#s-bsod h1{font-size:120px;font-weight:300;margin-bottom:20px}
+#s-bsod p{font-size:24px;max-width:900px;line-height:1.4}
+/* RESPONSIVE */
+@media (max-width:900px){#inv,#tools{width:160px;font-size:11px}#hint{display:none}.title{display:none}}
+</style>
+</head>
+<body>
+
+<!-- 3D ROOM -->
+<div id="c3d"></div>
+<div id="fade"></div>
+
+<!-- HARDWARE BUILD HUD -->
+<div id="topbar" class="panel"><span class="title">PC BUILD TO OS</span><div class="missions" id="mis1"></div><button class="mute" data-act="mute">🔊</button></div>
+<div id="inv" class="panel"><h4>INVENTORY</h4><div id="invList"></div></div>
+<div id="tools" class="panel">
+  <h4>BUILD STATUS</h4><div id="bstat"></div>
+  <h4>TOOLS</h4>
+  <button class="tbtn on" data-mode="hand">✋ Tangan — ambil & pasang</button>
+  <button class="tbtn" data-mode="remove">⤴ Lepas komponen / kabel</button>
+  <button class="tbtn" data-act="rotate">⟳ Putar CPU (R)</button>
+  <h4>KAMERA</h4>
+  <div class="row3"><button class="tbtn" data-cam="case">Casing</button><button class="tbtn" data-cam="desk">Meja</button><button class="tbtn" data-cam="room">Ruangan</button></div>
+  <h4>CABLES</h4><div id="cableList"></div>
+</div>
+<div id="bottom" class="panel"><div id="hint"></div><button class="big" data-act="check">CHECK BUILD</button><button class="big power" data-act="power">⏻ POWER</button></div>
+<div id="tip"></div><div id="toast"></div>
+<div id="modal"><div class="box"><pre id="modalText"></pre><button class="big" style="margin-top:14px" data-act="closeModal">OK</button></div></div>
+
+<!-- MONITOR -->
+<div id="monitorWorld">
+  <div id="monHud" class="panel" style="position:absolute;padding:5px 10px">
+    <span class="stg" data-stg="POST">POST</span><span class="stg" data-stg="BIOS">BIOS</span><span class="stg" data-stg="OS">OS</span><span class="stg" data-stg="DESKTOP">DESKTOP</span>
+    <span id="monStatus">STATUS —</span><div class="missions" id="mis2"></div>
+    <button class="mute" data-act="mute">🔊</button><button class="mute" data-act="exitRoom">⏻ Matikan & kembali ke ruangan</button>
+  </div>
+  <div id="bezel"><div id="screenBox"><div id="screen">
+    <!-- NO SIGNAL -->
+    <div class="scr" id="s-nosig"><div class="osd"><h2>NO DISPLAY SIGNAL</h2><div>HDMI 1 — tidak ada sinyal video</div><div id="nosigHint" style="margin-top:12px;color:#f3c35b;font-size:14px"></div><button class="sbtn" data-act="exitRoom" style="font-family:Segoe UI">Matikan PC & periksa hardware</button></div></div>
+    <!-- POST -->
+    <div class="scr" id="s-post"><div class="postlogo">VIRTUAL MEGATRENDS<br>UEFI FIRMWARE v2.21</div><div id="postText"></div><div id="postAct"></div></div>
+    <!-- BIOS -->
+    <div class="scr" id="s-bios"></div>
+    <!-- BOOT MESSAGES / OS INSTALLER -->
+    <div class="scr" id="s-msg"><div id="msgText" style="white-space:pre-wrap;line-height:1.5"></div><div id="msgAct"></div></div>
+    <div class="scr" id="s-inst"></div>
+    <!-- DESKTOP + APPS + GAME -->
+    <div class="scr" id="s-desk"><div class="mtn"></div><div class="mtn b"></div><div id="icons"></div><div id="wins"></div><div id="startMenu"></div>
+      <div id="taskbar"><button class="tbb" data-act="start" style="font-weight:700">◆ VirtuOS</button><div id="tbApps" style="display:flex;gap:4px"></div><div id="tray"><span id="trayTemp"></span><span id="trayClock"></span></div></div>
+    </div>
+    <!-- BSOD -->
+    <div class="scr" id="s-bsod"></div>
+  </div></div></div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+// ===============================
+// GLOBAL SYSTEM STATE
+// ===============================
+const S={
+  standoffs:false, mbInstalled:false, cpuInstalled:false, thermalPaste:false, coolerInstalled:false,
+  ramSlots:{A1:null,A2:null,B1:null,B2:null}, nvmeInstalled:false, hddInstalled:false, psuInstalled:false,
+  gpuInstalled:null, gpuType:'INTEGRATED',
+  cables:{ATX24:false,EPS8:false,PCIE:false,PWRSW:false,SATA_DATA:false,SATA_PWR:false,HDMI:null,USB:false},
+  bootPriority:['NVME','HDD','USB'], xmp:false, rebar:false, svm:true,
+  fanCurve:[[40,30],[60,50],[80,80],[90,100]],
+  osInstalled:false, osDisk:null,
+  powered:false, cpuLoad:0.03, gpuLoad:0.02, temp:27, fan:0.3, clock:3.8, maxTemp:0, hotTime:0, warned:false,
+  progress:{build:false,post:false,bios:false,os:false,system:false,game:false},
+  bench:null, gameFps:null, stage:'ROOM'
+};
+const CPU={brand:'AMD',name:'AMD Ryzen 7 5700G',arch:'Zen 3 "Cezanne" — 7nm TSMC',isa:'x86-64 (SSE4.2, AVX2, FMA3, AES-NI)',cores:8,threads:16,base:3.8,boost:4.6,l1:'512 KB (8 × 32KB I + 32KB D)',l2:'4 MB (8 × 512 KB)',l3:'16 MB (shared)',socket:'AM4',tdp:'65 W'};
+const GPUS={
+  INTEGRATED:{name:'AMD Radeon Vega 8 (Integrated)',type:'Integrated GPU (di dalam CPU)',vram:'512 MB (shared system RAM)',bus:'Shared memory controller',bw:()=>memBW().toFixed(1)+' GB/s (dibagi dengan CPU)',raw:26,score:1300,power:false,arch:'GCN 5.0 — 7nm'},
+  HIGH_END:{name:'NVIDIA GeForce RTX 3070',type:'Dedicated GPU',vram:'8 GB GDDR6',bus:'256-bit',bw:()=>'448 GB/s',raw:64,score:10500,power:true,arch:'Ampere — 8nm'},
+  MID:{name:'NVIDIA GeForce GTX 1650',type:'Dedicated GPU',vram:'4 GB GDDR5',bus:'128-bit',bw:()=>'128 GB/s',raw:44,score:4300,power:false,arch:'Turing — 12nm'}
+};
+const DISKS={NVME:{name:'NVMe M.2 SSD 512GB',type:'NVMe SSD',iface:'PCIe 3.0 x4 (NVMe 1.4)',speed:3500,size:512},HDD:{name:'SATA HDD 1TB 7200RPM',type:'Hard Disk Drive',iface:'SATA III 6Gb/s (AHCI)',speed:160,size:1000},USB:{name:'USB INSTALLER (VirtuOS 11)'},OSBM:{name:'VirtuOS Boot Manager'}};
+const ramCount=()=>Object.values(S.ramSlots).filter(Boolean).length;
+const isDual=()=>ramCount()===2&&S.ramSlots.A2&&S.ramSlots.B2;
+const memFreq=()=>S.xmp?3600:2133;
+const memBW=()=>memFreq()*8*(isDual()?2:1)/1000;
+const hddOK=()=>S.hddInstalled&&S.cables.SATA_DATA&&S.cables.SATA_PWR;
+const present=d=>d==='USB'?S.cables.USB:d==='NVME'?S.nvmeInstalled:d==='HDD'?hddOK():d==='OSBM'?(S.osInstalled&&present(S.osDisk)):false;
+const gpuNeedsPower=()=>S.gpuInstalled&&GPUS[S.gpuType].power;
+const displayOK=()=>S.cables.HDMI==='GPU'?!!S.gpuInstalled:S.cables.HDMI==='MB'?!S.gpuInstalled:false;
+const fanAt=t=>{const c=S.fanCurve;if(t<=c[0][0])return c[0][1];for(let i=1;i<c.length;i++){if(t<=c[i][0]){const a=c[i-1],b=c[i];return a[1]+(b[1]-a[1])*(t-a[0])/(b[0]-a[0]);}}return c[c.length-1][1];};
+
+// ===============================
+// AUDIO
+// ===============================
+let actx=null,master=null,muted=false,fanNode=null;
+function ac(){if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();master=actx.createGain();master.connect(actx.destination);}if(actx.state==='suspended')actx.resume();return actx;}
+function tone(f,d,type='square',v=.06,delay=0){const a=ac(),o=a.createOscillator(),g=a.createGain(),t=a.currentTime+delay;o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(master);o.start(t);o.stop(t+d+.02);}
+function noise(d,v=.1,freq=2000,delay=0){const a=ac(),b=a.createBuffer(1,a.sampleRate*d,a.sampleRate),ch=b.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=(Math.random()*2-1)*(1-i/ch.length);const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();f.type='bandpass';f.frequency.value=freq;g.gain.value=v;s.buffer=b;s.connect(f).connect(g).connect(master);s.start(a.currentTime+delay);}
+const sfx={
+  click:()=>noise(.04,.25,3000), snap:()=>{noise(.05,.35,1800);tone(900,.05,'triangle',.04)},
+  error:()=>{tone(220,.18,'square',.05);tone(170,.25,'square',.05,.18)}, key:()=>noise(.02,.15,4000),
+  power:()=>{tone(80,.4,'sine',.2);noise(.3,.08,600)}, beep:()=>tone(1000,.18,'square',.05),
+  postErr:()=>{for(let i=0;i<3;i++)tone(880,.45,'square',.05,i*.6)}, notify:()=>{tone(880,.08,'sine',.07);tone(1320,.12,'sine',.07,.09)},
+  bsod:()=>{tone(110,1.2,'sawtooth',.06);noise(.6,.15,300)}, hdd:()=>noise(.015,.5,900), ssd:()=>tone(4200,.01,'sine',.01),
+  done:()=>{[523,659,784].forEach((f,i)=>tone(f,.15,'triangle',.07,i*.12))}, boot:()=>{[392,523,659,784].forEach((f,i)=>tone(f,.35,'sine',.06,i*.18))},
+  jump:()=>tone(520,.1,'triangle',.05), coin:()=>{tone(988,.06,'square',.04);tone(1319,.1,'square',.04,.06)}, hit:()=>noise(.2,.4,400)
+};
+function fanSound(level){const a=ac();if(!fanNode){const b=a.createBuffer(1,a.sampleRate*2,a.sampleRate),c=b.getChannelData(0);for(let i=0;i<c.length;i++)c[i]=Math.random()*2-1;const s=a.createBufferSource();s.buffer=b;s.loop=true;const f=a.createBiquadFilter();f.type='lowpass';f.frequency.value=500;const g=a.createGain();g.gain.value=0;s.connect(f).connect(g).connect(master);s.start();fanNode={g,f};}fanNode.g.gain.setTargetAtTime(level*.05,a.currentTime,.3);fanNode.f.frequency.setTargetAtTime(300+level*900,a.currentTime,.3);}
+function toggleMute(){muted=!muted;ac();master.gain.value=muted?0:1;$$('[data-act=mute]').forEach(b=>b.textContent=muted?'🔇':'🔊');}
+
+// ===============================
+// 3D SCENE
+// ===============================
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.outputColorSpace=THREE.SRGBColorSpace;
+$('#c3d').appendChild(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x1d1f22);
+const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture;
+scene.add(new THREE.HemisphereLight(0xdfe6ee,0x3a3228,.35));
+const sun=new THREE.DirectionalLight(0xfff4e6,1.3);sun.position.set(-1.2,3,1.6);sun.castShadow=true;sun.shadow.mapSize.set(1536,1536);
+Object.assign(sun.shadow.camera,{left:-1.6,right:1.6,top:1.2,bottom:-1.2,near:.5,far:7});sun.shadow.bias=-.0004;scene.add(sun);
+const lamp=new THREE.SpotLight(0xfff0d8,6,3,.7,.6,1.5);lamp.position.set(-.55,1.55,-.2);lamp.target.position.set(-.3,.75,0);scene.add(lamp,lamp.target);
+
+function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;}
+const M=(color,r=.5,m=0,extra={})=>new THREE.MeshStandardMaterial({color,roughness:r,metalness:m,...extra});
+const mat={black:M(0x141619,.55,.1),plastic:M(0x2a2d31,.5,.05),steel:M(0x9aa0a6,.35,.9),alu:M(0xc5c9ce,.3,.85),gold:M(0xd4a84a,.3,1),dark:M(0x1c1e21,.4,.6),brass:M(0xb8913a,.35,.9),grey:M(0x7a8088,.45,.3),copper:M(0xc27b4a,.3,1),green:M(0x1f5a36,.6,.1),paste:M(0xa5aab0,.3,.5),slotG:M(0x8e949b,.5,.1),hl:new THREE.MeshBasicMaterial({color:0x4da3ff,transparent:true,opacity:.28,depthWrite:false}),hl2:new THREE.MeshBasicMaterial({color:0x5cff8a,transparent:true,opacity:.5,depthWrite:false})};
+function box(w,h,d,m,x=0,y=0,z=0,p){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;p&&p.add(o);return o;}
+function cyl(r1,r2,h,m,x=0,y=0,z=0,p,seg=16){const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg),m);o.position.set(x,y,z);o.castShadow=true;p&&p.add(o);return o;}
+function label(text,w,h,{bg='rgba(0,0,0,0)',fg='#ddd',size=48,font='bold'}={}){const t=canvasTex(512,Math.round(512*h/w),(g,W,H)=>{g.fillStyle=bg;g.fillRect(0,0,W,H);g.fillStyle=fg;g.font=`${font} ${size}px Segoe UI,Arial`;g.textAlign='center';g.textBaseline='middle';text.split('\n').forEach((l,i,a)=>g.fillText(l,W/2,H/2+(i-(a.length-1)/2)*size*1.15));});const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:t,transparent:true,roughness:.6}));m.rotation.x=-Math.PI/2;return m;}
+
+// Room
+const woodTex=canvasTex(512,512,(g,W,H)=>{g.fillStyle='#6b4e36';g.fillRect(0,0,W,H);for(let i=0;i<16;i++){g.fillStyle=`hsl(28,${30+Math.random()*10}%,${24+Math.random()*8}%)`;g.fillRect(0,i*32,W,31);}g.globalAlpha=.08;for(let i=0;i<300;i++){g.fillStyle='#000';g.fillRect(Math.random()*W,Math.random()*H,Math.random()*80,1);}});
+woodTex.wrapS=woodTex.wrapT=THREE.RepeatWrapping;woodTex.repeat.set(5,5);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(9,9),M(0xffffff,.7,0,{map:woodTex}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+box(9,3,.1,M(0xcfcac2,.9),0,1.5,-1.3,scene);box(.1,3,9,M(0xc4bfb7,.9),-3,1.5,0,scene);
+const pegTex=canvasTex(256,128,(g,W,H)=>{g.fillStyle='#b9a88a';g.fillRect(0,0,W,H);g.fillStyle='#5a5043';for(let x=6;x<W;x+=12)for(let y=6;y<H;y+=12){g.beginPath();g.arc(x,y,2,0,7);g.fill();}});
+pegTex.wrapS=pegTex.wrapT=THREE.RepeatWrapping;pegTex.repeat.set(4,2);
+box(2.4,.9,.02,M(0xffffff,.8,0,{map:pegTex}),0,1.55,-1.24,scene);
+[[-.9,1.7],[-.75,1.7],[-.6,1.72],[.8,1.65],[.95,1.65]].forEach(([x,y],i)=>box(.02,.18,.02,i<3?mat.steel:M(0xb33a2a,.5),x,y,-1.21,scene));
+box(1.2,.03,.3,M(0x6b4e36,.6),1.6,1.5,-1.12,scene);[[1.3,.2],[1.55,.26],[1.85,.18]].forEach(([x,h],i)=>box(.22,h,.2,M([0x8a6f4d,0x3b4a5a,0x6f2d2d][i],.8),x,1.515+h/2,-1.12,scene));
+// Desk
+const DESK_Y=.75;
+box(2.6,.04,1.05,M(0x8c8479,.55,0,{map:woodTex}),0,DESK_Y-.02,0,scene);
+[[-1.25,-.47],[1.25,-.47],[-1.25,.47],[1.25,.47]].forEach(([x,z])=>box(.05,DESK_Y-.04,.05,mat.dark,x,(DESK_Y-.04)/2,z,scene));
+const matMesh=box(.9,.003,.62,M(0x2e3b48,.9),-.42,DESK_Y+.0015,.02,scene);
+// Lamp
+cyl(.07,.08,.02,mat.dark,-.8,DESK_Y+.01,-.35,scene);const arm=box(.015,.8,.015,mat.dark,-.72,DESK_Y+.38,-.3,scene);arm.rotation.z=-.35;
+const lh=cyl(.03,.08,.1,mat.dark,-.56,1.55,-.22,scene);lh.rotation.z=.4;const bulb=cyl(.05,.05,.005,M(0xffffff,.2,0,{emissive:0xfff0d0,emissiveIntensity:2}),-.555,1.5,-.21,scene);bulb.rotation.z=.4;
+
+// ===============================
+// CAMERA
+// ===============================
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.02,30);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.maxPolarAngle=Math.PI*.49;controls.minDistance=.25;controls.maxDistance=4.2;
+const CAMS={case:{p:[-.25,1.25,.55],t:[-.3,.78,0]},desk:{p:[.05,1.42,1.0],t:[-.1,.82,-.02]},room:{p:[1.9,1.9,2.4],t:[0,.9,-.2]},monitor:{p:[.55,1.11,.2],t:[.55,1.11,-.27]}};
+camera.position.set(...CAMS.room.p);controls.target.set(...CAMS.room.t);
+function camTo(name,dur=1.2,cb){const c=CAMS[name];gsap.to(camera.position,{x:c.p[0],y:c.p[1],z:c.p[2],duration:dur,ease:'power2.inOut'});gsap.to(controls.target,{x:c.t[0],y:c.t[1],z:c.t[2],duration:dur,ease:'power2.inOut',onUpdate:()=>controls.update(),onComplete:cb});}
+setTimeout(()=>camTo('desk',2.2),400);
+
+// ===============================
+// PC COMPONENTS
+// ===============================
+const CASE=new THREE.Vector3(-.3,DESK_Y,.02);
+const C=(x,y,z)=>new THREE.Vector3(CASE.x+x,CASE.y+y,CASE.z+z);
+const MB={x:-.08,z:-.05,y:.024};const MBT=MB.y+.004;
+const P={SOCKET:[-.02,0,-.07],A1:[.05,0,-.06],A2:[.062,0,-.06],B1:[.074,0,-.06],B2:[.086,0,-.06],ATX24:[.112,.006,-.03],EPS:[-.075,.006,-.14],PCIE:[-.03,0,.035],M2:[-.02,0,.09],SATA:[.112,.004,.07],FP:[.09,.003,.14],IO_HDMI:[-.124,.03,-.05],IO_USB:[-.124,.03,-.1]};
+const mbp=(k,dy=0)=>C(MB.x+P[k][0],MBT+P[k][1]+dy,MB.z+P[k][2]);
+const GPU_POS=()=>C(MB.x,MBT+.001,MB.z+.035);
+const HDD_POS=C(.14,.012,.17), PSU_POS=C(-.11,.012,.19);
+// Case (open test-bench chassis)
+const caseG=new THREE.Group();caseG.position.copy(CASE);scene.add(caseG);
+const caseM=M(0x25282c,.45,.6);
+box(.46,.012,.5,caseM,0,.006,0,caseG);box(.46,.05,.01,caseM,0,.025,-.245,caseG);box(.46,.05,.01,caseM,0,.025,.245,caseG);box(.01,.02,.5,caseM,-.225,.01,0,caseG);
+box(.012,.2,.5,caseM,.229,.1,0,caseG);box(.004,.18,.46,M(0x303438,.2,.3,{transparent:true,opacity:.35}),.237,.1,0,caseG);
+const pwrBtn=cyl(.009,.009,.006,mat.steel,.238,.16,-.18,caseG);pwrBtn.rotation.z=Math.PI/2;pwrBtn.userData.power=true;
+const pwrLedM=M(0x222222,.3,0,{emissive:0x000000});const pwrLed=cyl(.002,.002,.004,pwrLedM,.238,.16,-.155,caseG);pwrLed.rotation.z=Math.PI/2;
+caseG.add(Object.assign(label('FRONT PANEL\n⏻ POWER',.1,.05,{fg:'#9aa',size:40}),{position:new THREE.Vector3(.2,.013,-.19)}));
+const standoffG=new THREE.Group();scene.add(standoffG);standoffG.visible=false;
+[[-.11,-.14],[.11,-.14],[-.11,0],[.11,0],[-.11,.14],[.11,.14]].forEach(([x,z])=>cyl(.003,.003,.012,mat.brass,0,0,0,standoffG,6).position.copy(C(MB.x+x,.018,MB.z+z)));
+
+const comps={};const fans=[];let mbLedM;
+function compGroup(id,name,kind,build,desk,deskRot=[0,0,0],installRot=[0,0,0]){const g=new THREE.Group();build(g);g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});g.userData.compId=id;g.position.copy(desk);g.rotation.set(...deskRot);scene.add(g);comps[id]={id,name,kind,g,desk:desk.clone(),deskRot,installRot,installed:false,slot:null};}
+const dy=DESK_Y;
+// Standoff kit
+compGroup('standoff','Standoff kit (6×)','standoff',g=>{box(.07,.012,.05,M(0xd9d5c8,.8),0,.006,0,g);for(let i=0;i<3;i++)cyl(.003,.003,.012,mat.brass,-.02+i*.02,.018,0,g,6);},new THREE.Vector3(-.95,dy,.32));
+// Motherboard
+const pcbTex=canvasTex(488,610,(g,W,H)=>{g.fillStyle='#16191b';g.fillRect(0,0,W,H);g.strokeStyle='#23292c';g.lineWidth=2;for(let i=0;i<60;i++){g.beginPath();let x=Math.random()*W,y=Math.random()*H;g.moveTo(x,y);g.lineTo(x+rnd(-120,120),y);g.lineTo(x+rnd(-120,120),y+rnd(-120,120));g.stroke();}
+  const L=(t,rx,rz,s=14)=>{g.fillStyle='#cfd3d6';g.font=`bold ${s}px Arial`;g.textAlign='center';g.fillText(t,(rx/.244+.5)*W,(rz/.305+.5)*H);};
+  L('A1',.05,-.135,11);L('A2',.062,-.135,11);L('B1',.074,-.135,11);L('B2',.086,-.135,11);L('DDR4_A2 + B2 = DUAL CH.',.068,.022,10);L('AM4 CPU',-.02,-.02,13);L('PCIEX16_1',-.03,.05,12);L('M.2_1 (PCIe)',-.02,.112,11);L('SATA6G',.112,.095,10);L('F_PANEL',.09,.128,10);L('ATX_24P',.1,.012,10);L('CPU_8P',-.075,-.125,10);L('B550 VIRTUAL',.03,.14,15);});
+const mbTopMat=new THREE.MeshStandardMaterial({map:pcbTex,roughness:.6,metalness:.2});
+compGroup('mb','Motherboard ATX','mb',g=>{
+  new THREE.Mesh(new THREE.BoxGeometry(.244,.004,.305),[mat.black,mat.black,mbTopMat,mat.black,mat.black,mat.black]).position.set(0,.002,0);g.add(g.children[0]||new THREE.Object3D());
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.244,.004,.305),[mat.black,mat.black,mbTopMat,mat.black,mat.black,mat.black]);b.position.y=.002;g.add(b);
+  const T=.004,p=k=>P[k];
+  box(.045,.006,.045,M(0xdedede,.4,.3),p('SOCKET')[0],T+.003,p('SOCKET')[2],g);
+  const tri=box(.005,.001,.005,mat.gold,p('SOCKET')[0]-.019,T+.0065,p('SOCKET')[2]-.019,g);tri.rotation.y=Math.PI/4;
+  box(.002,.004,.05,mat.steel,p('SOCKET')[0]+.026,T+.004,p('SOCKET')[2],g);
+  ['A1','A2','B1','B2'].forEach(k=>{box(.006,.008,.135,(k==='A2'||k==='B2')?mat.slotG:mat.black,p(k)[0],T+.004,p(k)[2],g);});
+  box(.09,.009,.008,mat.steel,p('PCIE')[0],T+.0045,p('PCIE')[2],g);
+  box(.008,.004,.022,mat.black,p('M2')[0]-.04,T+.002,p('M2')[2],g);cyl(.002,.002,.004,mat.gold,p('M2')[0]+.04,T+.002,p('M2')[2],g,6);
+  box(.012,.012,.052,mat.black,p('ATX24')[0],T+.006,p('ATX24')[2],g);box(.024,.011,.012,mat.black,p('EPS')[0],T+.0055,p('EPS')[2],g);
+  box(.01,.008,.02,mat.black,p('SATA')[0],T+.004,p('SATA')[2],g);box(.02,.006,.006,mat.black,p('FP')[0],T+.003,p('FP')[2],g);
+  box(.02,.018,.07,mat.dark,-.075,T+.009,-.065,g);box(.07,.018,.02,mat.dark,-.02,T+.009,-.125,g);box(.04,.008,.04,mat.dark,.06,T+.004,.1,g);
+  box(.012,.04,.16,mat.dark,-.116,T+.02,-.07,g);box(.006,.006,.014,mat.black,-.124,T+.026,p('IO_HDMI')[2],g);
+  box(.006,.006,.014,M(0x2a5fbf,.4),-.124,T+.026,p('IO_USB')[2],g);box(.006,.006,.014,M(0x2a5fbf,.4),-.124,T+.016,p('IO_USB')[2],g);
+  mbLedM=M(0x111111,.4,0,{emissive:0x000000});box(.004,.002,.03,mbLedM,.115,T+.001,.12,g);
+},new THREE.Vector3(-.95,dy,-.08),[0,.4,0]);
+// CPU
+compGroup('cpu','CPU Ryzen 7 5700G','cpu',g=>{box(.04,.0015,.04,mat.green,0,.00075,0,g);box(.034,.0025,.034,mat.alu,0,.0027,0,g);const l=label('AMD\nRYZEN 7 5700G',.03,.02,{fg:'#333',size:60});l.position.y=.0041;g.add(l);const t=box(.005,.0005,.005,mat.gold,-.017,.0042,-.017,g);t.rotation.y=Math.PI/4;},new THREE.Vector3(.02,dy,.3));
+const pasteMesh=cyl(.0065,.0065,.0012,mat.paste,0,0,0,scene,20);pasteMesh.visible=false;pasteMesh.position.copy(mbp('SOCKET',.006+.004+.0006));
+compGroup('paste','Thermal Paste','paste',g=>{cyl(.006,.006,.08,M(0xe8e8e8,.4),0,0,0,g);cyl(.002,.004,.015,mat.grey,0,.047,0,g);cyl(.004,.004,.02,mat.grey,0,-.05,0,g);},new THREE.Vector3(.12,dy+.007,.32),[0,0,Math.PI/2],[0,0,.4]);
+// Cooler
+compGroup('cooler','CPU Cooler (tower)','cooler',g=>{box(.04,.006,.04,mat.copper,0,.003,0,g);[-.012,-.004,.004,.012].forEach(x=>cyl(.003,.003,.12,mat.copper,x,.066,0,g,8));const fin=box(.035,.1,.075,mat.alu,0,.075,0,g);
+  const fan=new THREE.Group();fan.position.set(-.03,.075,0);g.add(fan);box(.022,.098,.076,mat.black,0,0,0,fan);const bl=new THREE.Group();bl.position.x=-.012;fan.add(bl);for(let i=0;i<7;i++){const b=box(.002,.034,.012,mat.grey,0,0,0,bl);b.geometry.translate(0,.019,0);b.rotation.x=i*Math.PI*2/7;b.rotation.y=.3;}cyl(.01,.01,.004,mat.dark,-.013,0,0,fan).rotation.z=Math.PI/2;fans.push({o:bl,axis:'x',k:1});},new THREE.Vector3(.55,dy,.28),[0,.6,0]);
+// RAM sticks
+['ram1','ram2'].forEach((id,i)=>compGroup(id,'RAM DDR4 8GB #'+(i+1),'ram',g=>{box(.0012,.031,.133,mat.green,0,.0155,0,g);box(.004,.028,.13,M(0x2b2e33,.4,.7),0,.017,0,g);box(.0014,.004,.12,mat.gold,0,.002,0,g);const l=label('DDR4 8GB 3600',.1,.02,{fg:'#ccc',size:56});l.rotation.set(0,Math.PI/2,0);l.position.set(.0021,.018,0);g.add(l);},new THREE.Vector3(.23+i*.055,dy+.002,.3),[0,0,Math.PI/2]));
+// NVMe
+compGroup('nvme','NVMe M.2 SSD 512GB','nvme',g=>{box(.08,.0015,.022,mat.black,0,.00075,0,g);box(.016,.0015,.012,M(0x333a40,.3,.6),.01,.0022,0,g);const l=label('NVMe 512GB',.04,.016,{bg:'#e8e8e8',fg:'#222',size:60});l.position.set(-.012,.0016,0);g.add(l);},new THREE.Vector3(.4,dy,.32));
+// HDD
+compGroup('hdd','SATA HDD 1TB','hdd',g=>{box(.1,.026,.147,mat.alu,0,.013,0,g);const l=label('SATA HDD\n1TB 7200RPM',.08,.09,{bg:'#e6e6e6',fg:'#223',size:44});l.position.set(0,.0262,.02);g.add(l);box(.02,.006,.004,mat.black,-.02,.013,-.074,g);box(.03,.006,.004,mat.black,.02,.013,-.074,g);},new THREE.Vector3(.78,dy,.25));
+// GPUs
+function gpuBuild(g,len,nf,name,power){const h=.11,t=.04;box(len,h,t,M(0x2a2d31,.45,.5),0,h/2+.006,0,g);box(len*.8,.006,.004,mat.green,0,.004,0,g);box(len*.3,.004,.002,mat.gold,-.03,.002,0,g);box(.002,.12,.02,mat.steel,-len/2-.003,.066,0,g);box(.004,.006,.012,mat.black,-len/2-.006,.03,0,g);
+  const l=label(name,len*.6,.018,{fg:'#ddd',size:54});l.position.set(0,h+.0065,0);g.add(l);if(power)box(.02,.008,.01,mat.black,.09,h+.008,0,g);
+  for(let i=0;i<nf;i++){const x=nf===1?0:(i?.06:-.06);cyl(.043,.043,.003,mat.black,x,.063,t/2+.001,g).rotation.x=Math.PI/2;const bl=new THREE.Group();bl.position.set(x,.063,t/2+.004);g.add(bl);for(let k=0;k<9;k++){const b=box(.012,.036,.002,mat.grey,0,0,0,bl);b.geometry.translate(0,.02,0);b.rotation.z=k*Math.PI*2/9;}fans.push({o:bl,axis:'z',k:1.3,gpu:true});}}
+compGroup('gpuH','GPU RTX 3070 (High-End)','gpu',g=>gpuBuild(g,.26,2,'GEFORCE RTX 3070',true),new THREE.Vector3(1.0,dy+.021,.34),[-Math.PI/2,0,0]);
+compGroup('gpuM','GPU GTX 1650 (Mid-Range)','gpu',g=>gpuBuild(g,.17,1,'GTX 1650',false),new THREE.Vector3(1.05,dy+.021,.02),[-Math.PI/2,0,.2]);
+comps.gpuH.gtype='HIGH_END';comps.gpuM.gtype='MID';
+// PSU
+compGroup('psu','PSU 650W 80+ Gold','psu',g=>{box(.15,.086,.09,M(0x1a1b1d,.5,.4),0,.043,0,g);cyl(.036,.036,.002,mat.dark,0,.087,0,g,24);const l=label('650W  80+ GOLD',.12,.02,{fg:'#c9a24a',size:50});l.position.set(0,.0875,.035);g.add(l);box(.004,.04,.06,mat.black,.076,.04,0,g);const bl=new THREE.Group();bl.position.y=.089;g.add(bl);for(let k=0;k<7;k++){const b=box(.01,.001,.03,mat.grey,0,0,0,bl);b.geometry.translate(0,0,.016);b.rotation.y=k*Math.PI*2/7;}fans.push({o:bl,axis:'y',k:.6,psu:true});},new THREE.Vector3(-1.02,dy,.1));
+// Monitor, keyboard, mouse
+const monG=new THREE.Group();monG.position.set(.55,dy,-.3);scene.add(monG);
+box(.24,.012,.17,mat.dark,0,.006,0,monG);box(.05,.26,.025,mat.dark,0,.14,-.03,monG);box(.64,.39,.03,M(0x111214,.4,.3),0,.36,0,monG);
+const screenMat=new THREE.MeshStandardMaterial({color:0x040506,roughness:.15,metalness:.2,emissive:0x000000});
+const scrMesh=new THREE.Mesh(new THREE.PlaneGeometry(.61,.345),screenMat);scrMesh.position.set(0,.365,.0155);monG.add(scrMesh);
+const kbG=new THREE.Group();kbG.position.set(.55,dy,.0);scene.add(kbG);box(.44,.02,.14,mat.plastic,0,.01,0,kbG);
+const keys=new THREE.InstancedMesh(new THREE.BoxGeometry(.022,.008,.022),M(0x1b1d20,.6),75);let ki=0;const dm=new THREE.Object3D();for(let r=0;r<5;r++)for(let c=0;c<15;c++){dm.position.set(-.196+c*.028,.024,-.052+r*.026);dm.updateMatrix();keys.setMatrixAt(ki++,dm.matrix);}keys.castShadow=true;kbG.add(keys);
+const mouse3=new THREE.Mesh(new THREE.SphereGeometry(.03,16,10),mat.plastic);mouse3.scale.set(.8,.45,1.2);mouse3.position.set(.88,dy+.012,.0);mouse3.castShadow=true;scene.add(mouse3);
+box(.25,.003,.3,M(0x222428,.9),.88,dy+.0015,0,scene);
+
+// ===============================
+// HARDWARE ASSEMBLY
+// ===============================
+let mode='hand',carry=null,cpuRot=1,highlights=[];
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();let lastPtr={x:innerWidth/2,y:innerHeight/2};
+function targets(c){const t=[];const add=(key,pos,size,label,ok=()=>null)=>t.push({key,pos,size,label,ok});
+  switch(c.kind){
+    case 'standoff':add('STANDOFF',C(MB.x,.012,MB.z),[.244,.004,.305],'Motherboard tray');break;
+    case 'mb':add('MB',C(MB.x,MB.y,MB.z),[.244,.006,.305],'Motherboard tray',()=>S.standoffs?null:'Pasang STANDOFF dulu — tanpa standoff PCB motherboard short ke casing!');break;
+    case 'cpu':if(S.mbInstalled)add('SOCKET',mbp('SOCKET',.006),[.045,.004,.045],'CPU Socket AM4');break;
+    case 'paste':if(S.cpuInstalled)add('PASTE',mbp('SOCKET',.006+.004),[.034,.003,.034],'Permukaan IHS CPU',()=>S.coolerInstalled?'Lepas CPU cooler dulu sebelum mengoleskan th
